@@ -1,0 +1,1 @@
+docker build -t gameserver . && docker tag gameserver parthmehrotra/gameserver && docker push parthmehrotra/gameserver
