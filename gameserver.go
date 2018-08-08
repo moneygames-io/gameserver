@@ -39,7 +39,7 @@ func main() {
 		PlayerCount: players,
 	}
 
-	gameserver.GL = gameLoop.New(2, gameserver.MapUpdater)
+	gameserver.GL = gameLoop.New(5, gameserver.MapUpdater)
 
 	// TODO set status to ready
 	http.HandleFunc("/ws", wsHandler)
