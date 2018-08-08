@@ -15,14 +15,16 @@ build:
   stage: build
   script:
     - docker build -t gameserver .
-    - docker tag gameserver moneygames/gameserver:$(git rev-parse --abbrev-ref HEAD)
+    - docker tag gameserver moneygames/gameserver:$CI_COMMIT_REF_NAME
     
 release:
   stage: release
   script:
-    - docker push moneygames/gameserver:$(git rev-parse --abbrev-ref HEAD)
+    - docker push moneygames/gameserver:$CI_COMMIT_REF_NAME
     
 deploy:
   stage: deploy
+  only:
+    - master
   script:
     - ssh root@142.93.11.143 'cd main && ./restart'
