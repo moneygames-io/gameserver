@@ -27,7 +27,9 @@ func main() {
 	redisClient := connectToRedis()
 	id := os.Getenv("GSPORT")
 
-	players := 3
+	redisClient.HSet(id, "status", "idle")
+
+	players := getPlayers(id, redisClient)
 
 	fmt.Println(players)
 
@@ -41,7 +43,6 @@ func main() {
 
 	gameserver.GL = gameLoop.New(5, gameserver.MapUpdater)
 
-	// TODO set status to ready
 	http.HandleFunc("/ws", wsHandler)
 	panic(http.ListenAndServe(":10000", nil))
 
@@ -49,12 +50,13 @@ func main() {
 
 func getPlayers(id string, redisClient *redis.Client) int {
 	for {
-		playerCountString, _ := redisClient.Get(id).Result()
+		playerCountString, _ := redisClient.HGet(id, "players").Result()
 		players, _ := strconv.Atoi(playerCountString)
 		if players == 0 {
 			time.Sleep(1000 * time.Millisecond)
 			fmt.Println("No players yet")
 		} else {
+			redisClient.HSet(id, "status", "ready")
 			return players
 		}
 	}
