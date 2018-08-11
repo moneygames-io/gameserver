@@ -66,7 +66,7 @@ func connectToRedis() *redis.Client {
 	var client *redis.Client
 	for {
 		client = redis.NewClient(&redis.Options{
-			Addr:     "redis:6379",
+			Addr:     "redis-gameservers:6379",
 			Password: "",
 			DB:       0,
 		})
