@@ -149,7 +149,7 @@ func (gs *GameServer) MapUpdater(delta float64) {
 			fmt.Println(view)
 		}
 
-		go client.Conn.WriteJSON(&view)
+		client.Conn.WriteJSON(&view)
 	}
 
 	if len(gs.World.Players) == 1 {
