@@ -13,30 +13,33 @@ import (
 )
 
 type GameServer struct {
-	Users       map[*Client]*Player
-	World       *Map
-	RedisClient *redis.Client
-	ID          string
-	GL          *gameLoop.GameLoop
-	PlayerCount int
+	Users           map[*Client]*Player
+	World           *Map
+	GameServerRedis *redis.Client
+	PlayerRedis     *redis.Client
+	ID              string
+	GL              *gameLoop.GameLoop
+	PlayerCount     int
 }
 
 var gameserver *GameServer
 
 func main() {
-	redisClient := connectToRedis()
+	gameServerRedis := connectToRedis("redis-gameservers:6379")
+	playerRedis := connectToRedis("redis-players:6379")
 	id := os.Getenv("GSPORT")
 
-	redisClient.HSet(id, "status", "idle")
+	gameServerRedis.HSet(id, "status", "idle")
 
-	players := getPlayers(id, redisClient)
+	players := getPlayers(id, gameServerRedis)
 
 	fmt.Println(players)
 
 	gameserver = &GameServer{
 		Users:       make(map[*Client]*Player),
 		World:       NewMap(2),
-		RedisClient: redisClient,
+		GameServerRedis: gameServerRedis,
+		PlayerRedis: playerRedis,
 		ID:          id,
 		PlayerCount: players,
 	}
@@ -48,14 +51,14 @@ func main() {
 
 }
 
-func getPlayers(id string, redisClient *redis.Client) int {
+func getPlayers(id string, gameServerRedis *redis.Client) int {
 	for {
-		playerCountString, _ := redisClient.HGet(id, "players").Result()
+		playerCountString, _ := gameServerRedis.HGet(id, "players").Result()
 		players, _ := strconv.Atoi(playerCountString)
 		if players == 0 {
 			time.Sleep(1000 * time.Millisecond)
 		} else {
-			redisClient.HSet(id, "status", "ready")
+			gameServerRedis.HSet(id, "status", "ready")
 			return players
 		}
 	}
@@ -63,11 +66,11 @@ func getPlayers(id string, redisClient *redis.Client) int {
 	return 0
 }
 
-func connectToRedis() *redis.Client {
+func connectToRedis(addr string) *redis.Client {
 	var client *redis.Client
 	for {
 		client = redis.NewClient(&redis.Options{
-			Addr:     "redis-gameservers:6379",
+			Addr:     addr,
 			Password: "",
 			DB:       0,
 		})
@@ -101,7 +104,7 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 
 	error := conn.ReadJSON(message)
 
-	if error != nil || !validateToken(message.Token) {
+	if error != nil || !validateToken(message.Token, gs.PlayerRedis) {
 		conn.Close()
 	}
 
@@ -121,13 +124,18 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 	}
 }
 
-func validateToken(token string) bool {
-	// TODO validate token
-	return true
+func validateToken(token string, playerRedis *redis.Client) bool {
+	status := playerRedis.HGet(token, "status").Result()
+	if status=="paid"{
+		return true
+	}
+	else{
+		return false
+	}
 }
 
 func (gs *GameServer) PublishState(msg string) {
-	gs.RedisClient.HSet(gs.ID, "status", msg)
+	gs.gameServerRedis.HSet(gs.ID, "status", msg)
 }
 
 func (gs *GameServer) MapUpdater(delta float64) {
