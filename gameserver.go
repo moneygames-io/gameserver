@@ -84,7 +84,7 @@ func connectToRedis(addr string) *redis.Client {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	fmt.Println("gameserver connected to redis")
+	fmt.Println("connected to redis")
 
 	return client
 }
@@ -105,6 +105,7 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 	error := conn.ReadJSON(message)
 
 	if error != nil || !validateToken(message.Token, gs.PlayerRedis) {
+		fmt.Println("Closing connection, token invalid", error, message)
 		conn.Close()
 	}
 
@@ -126,6 +127,7 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 
 func validateToken(token string, playerRedis *redis.Client) bool {
 	status, _ := playerRedis.HGet(token, "status").Result()
+	fmt.Println(status)
 	return status == "paid"
 }
 
