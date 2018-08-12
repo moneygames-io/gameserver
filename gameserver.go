@@ -128,7 +128,7 @@ func validateToken(token string) bool {
 }
 
 func (gs *GameServer) PublishState(msg string) {
-	gs.RedisClient.Set(gs.ID, msg, 0)
+	gs.RedisClient.HSet(gs.ID, "status", msg)
 }
 
 func (gs *GameServer) MapUpdater(delta float64) {
