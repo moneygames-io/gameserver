@@ -85,6 +85,7 @@ func (m *Map) SnakeCreated(snake *Snake) {
 	m.AddNode(snake.Head)
 }
 
+// Add node allows you to place a node 
 func (m *Map) AddNode(snakeNode *SnakeNode) int {
 	col := snakeNode.Col
 	row := snakeNode.Row
