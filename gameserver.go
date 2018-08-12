@@ -54,7 +54,6 @@ func getPlayers(id string, redisClient *redis.Client) int {
 		players, _ := strconv.Atoi(playerCountString)
 		if players == 0 {
 			time.Sleep(1000 * time.Millisecond)
-			fmt.Println("No players yet")
 		} else {
 			redisClient.HSet(id, "status", "ready")
 			return players
