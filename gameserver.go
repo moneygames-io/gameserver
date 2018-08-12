@@ -125,17 +125,12 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 }
 
 func validateToken(token string, playerRedis *redis.Client) bool {
-	status := playerRedis.HGet(token, "status").Result()
-	if status=="paid"{
-		return true
-	}
-	else{
-		return false
-	}
+	status, _ := playerRedis.HGet(token, "status").Result()
+	return status == "paid"
 }
 
 func (gs *GameServer) PublishState(msg string) {
-	gs.gameServerRedis.HSet(gs.ID, "status", msg)
+	gs.GameServerRedis.HSet(gs.ID, "status", msg)
 }
 
 func (gs *GameServer) MapUpdater(delta float64) {
