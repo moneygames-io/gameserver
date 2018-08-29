@@ -1,4 +1,3 @@
-// TODO Standardize between row/col and x/y across the app
 package main
 
 import (
@@ -14,10 +13,11 @@ type Tile struct {
 }
 
 type Map struct {
-	Tiles   [][]Tile
-	Players map[*Player]*Snake
-	Losers  map[*Player]*Snake
-	Colors  map[*Snake]uint32
+	Tiles         [][]Tile
+	Players       map[*Player]*Snake
+	Losers        map[*Player]*Snake
+	Colors        map[*Snake]uint32
+	FoodPerPlayer int
 }
 
 type MapEvent interface {
@@ -29,12 +29,13 @@ type MapEvent interface {
 	SnakeRemoved(*Snake)
 }
 
-func NewMap(players int) *Map {
+func NewMap(players int, scalingFactor int, foodFactor int) *Map {
 	newMap := &Map{}
-	newMap.Tiles = make([][]Tile, players*30)
+	newMap.Tiles = make([][]Tile, players*scalingFactor)
+	newMap.FoodPerPlayer = foodFactor
 
 	for i := range newMap.Tiles {
-		newMap.Tiles[i] = make([]Tile, players*30)
+		newMap.Tiles[i] = make([]Tile, players*scalingFactor)
 	}
 
 	newMap.Players = make(map[*Player]*Snake)
@@ -53,7 +54,7 @@ func (m *Map) SpawnNewPlayer(player *Player) (int, int) {
 		col = rand.Intn(len(m.Tiles[0]))
 	}
 
-	m.SpawnFood(20)
+	m.SpawnFood(m.FoodPerPlayer)
 
 	m.SpawnNewPlayerAt(player, row, col)
 	return row, col

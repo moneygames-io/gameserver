@@ -33,11 +33,9 @@ func main() {
 
 	players := getPlayers(id, gameServerRedis)
 
-	fmt.Println(players)
-
 	gameserver = &GameServer{
 		Users:           make(map[*Client]*Player),
-		World:           NewMap(2),
+		World:           NewMap(3, 30, 20),
 		GameServerRedis: gameServerRedis,
 		PlayerRedis:     playerRedis,
 		ID:              id,
@@ -109,8 +107,6 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 		conn.Close()
 	}
 
-	// TODO token consumed
-
 	c := NewClient(message, conn)
 	c.Player = &Player{}
 	gs.World.SpawnNewPlayer(c.Player)
@@ -127,8 +123,11 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 
 func validateToken(token string, playerRedis *redis.Client) bool {
 	status, _ := playerRedis.HGet(token, "status").Result()
-	fmt.Println(status)
-	return status == "paid"
+	if status == "paid" {
+		playerRedis.HSet(token, "status", "in game")
+		return true
+	}
+	return false
 }
 
 func (gs *GameServer) PublishState(msg string) {
