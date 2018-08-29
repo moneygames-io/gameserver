@@ -53,13 +53,13 @@ func (c *Client) GetView(m *Map) [][]uint32 {
 func (c *Client) CollectInput(conn *websocket.Conn) {
 	msg := &ClientUpdateMessage{}
 	for {
-		err := conn.ReadJSON(msg);
+		err := conn.ReadJSON(msg)
 		if err == nil {
 			c.Player.CurrentDirection = msg.CurrentDirection
 			c.Player.CurrentSprint = msg.CurrentSprint
 			c.CurrentZoomLevel = msg.CurrentZoomLevel
 		} else {
-			fmt.Println("Error:",err)
+			fmt.Println("Error:", err)
 			c.Player.Snake.Dead()
 			return
 		}

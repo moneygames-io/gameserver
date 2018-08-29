@@ -36,12 +36,12 @@ func main() {
 	fmt.Println(players)
 
 	gameserver = &GameServer{
-		Users:       make(map[*Client]*Player),
-		World:       NewMap(2),
+		Users:           make(map[*Client]*Player),
+		World:           NewMap(2),
 		GameServerRedis: gameServerRedis,
-		PlayerRedis: playerRedis,
-		ID:          id,
-		PlayerCount: players,
+		PlayerRedis:     playerRedis,
+		ID:              id,
+		PlayerCount:     players,
 	}
 
 	gameserver.GL = gameLoop.New(5, gameserver.MapUpdater)
