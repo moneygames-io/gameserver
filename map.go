@@ -2,6 +2,7 @@ package main
 
 import (
 	"math/rand"
+	"sort"
 	"time"
 
 	"github.com/Parth/boolean"
@@ -86,7 +87,6 @@ func (m *Map) SnakeCreated(snake *Snake) {
 	m.AddNode(snake.Head)
 }
 
-// Add node allows you to place a node
 func (m *Map) AddNode(snakeNode *SnakeNode) int {
 	col := snakeNode.Col
 	row := snakeNode.Row
@@ -139,6 +139,28 @@ func (m *Map) Update() {
 			snake.Move(player.CurrentDirection)
 		}
 	}
+}
+
+// Can probably be optimized to: https://golang.org/pkg/container/heap/#example__PriorityQueue
+func (m *Map) GetLeaderboard(topN int) []string {
+	snakes := make([]*Snake, len(m.Players))
+	leaderboard := make([]string, len(m.Players))
+
+	index := 0
+	for _, v := range m.Players {
+		snakes[index] = v
+		index++
+	}
+
+	sort.Slice(snakes, func(i, j int) bool {
+		return snakes[i].Length > snakes[j].Length
+	})
+
+	for i, snake := range snakes {
+		leaderboard[i] = snake.Player.Client.Name
+	}
+
+	return leaderboard
 }
 
 func (m *Map) GetColor(tile *Tile) uint32 {

@@ -16,7 +16,12 @@ type Client struct {
 func NewClient(r *RegisterMessage, conn *websocket.Conn) *Client {
 	c := &Client{}
 
-	c.Name = r.Name
+	if r.Name == "" {
+		c.Name = "unnamed"
+	} else {
+		c.Name = r.Name
+	}
+
 	c.Token = r.Token
 	c.Conn = conn
 

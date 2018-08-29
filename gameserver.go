@@ -35,7 +35,7 @@ func main() {
 
 	gameserver = &GameServer{
 		Users:           make(map[*Client]*Player),
-		World:           NewMap(3, 30, 20),
+		World:           NewMap(players, 30, 20),
 		GameServerRedis: gameServerRedis,
 		PlayerRedis:     playerRedis,
 		ID:              id,
@@ -110,6 +110,7 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 	c := NewClient(message, conn)
 	c.Player = &Player{}
 	gs.World.SpawnNewPlayer(c.Player)
+	c.Player.Client = c
 
 	gs.Users[c] = c.Player
 	go c.CollectInput(conn)
@@ -137,6 +138,7 @@ func (gs *GameServer) PublishState(msg string) {
 func (gs *GameServer) MapUpdater(delta float64) {
 	gs.PublishState("game started")
 	gs.World.Update()
+	leaderboard := gs.World.GetLeaderboard(len(gs.World.Players))
 
 	for client := range gs.Users {
 		var view [][]uint32
@@ -145,10 +147,10 @@ func (gs *GameServer) MapUpdater(delta float64) {
 			view = gs.World.Render()
 		} else {
 			view = client.GetView(gs.World)
-			fmt.Println(view)
 		}
 
-		client.Conn.WriteJSON(&view)
+		client.Conn.WriteJSON(map[string][][]uint32{"Perspective": view})
+		client.Conn.WriteJSON(map[string][]string{"Leaderboard": leaderboard})
 	}
 
 	if len(gs.World.Players) == 1 {

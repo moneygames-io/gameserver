@@ -84,7 +84,6 @@ func (snake *Snake) GrowHead() int {
 
 	status := snake.Events.AddNode(newHead)
 
-	// Was it added?
 	if status != 2 {
 		oldHead.Prev = newHead
 
@@ -96,7 +95,7 @@ func (snake *Snake) GrowHead() int {
 }
 
 func (snake *Snake) ShortenTail(howMuch int) *SnakeNode {
-	if snake.Length == 1 { // no tail left
+	if snake.Length == 1 {
 		return nil
 	}
 	oldTail := snake.Tail
@@ -109,7 +108,7 @@ func (snake *Snake) ShortenTail(howMuch int) *SnakeNode {
 
 	snake.Events.RemoveNode(oldTail.Row, oldTail.Col)
 
-	if howMuch > 1 { // more tail to get rid off
+	if howMuch > 1 {
 		return snake.ShortenTail(howMuch - 1)
 	} else {
 		return oldTail
