@@ -150,7 +150,7 @@ func (gs *GameServer) MapUpdater(delta float64) {
 		}
 
 		client.Conn.WriteJSON(map[string][][]uint32{"Perspective": view})
-		client.Conn.WriteJSON(map[string][]string{"Leaderboard": leaderboard})
+		client.Conn.WriteJSON(map[string][]LeaderboardMessage{"Leaderboard": leaderboard})
 	}
 
 	if len(gs.World.Players) == 1 {

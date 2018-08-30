@@ -141,10 +141,9 @@ func (m *Map) Update() {
 	}
 }
 
-// Can probably be optimized to: https://golang.org/pkg/container/heap/#example__PriorityQueue
-func (m *Map) GetLeaderboard(topN int) []string {
+func (m *Map) GetLeaderboard(topN int) []LeaderboardMessage {
 	snakes := make([]*Snake, len(m.Players))
-	leaderboard := make([]string, len(m.Players))
+	leaderboard := make([]LeaderboardMessage, len(m.Players))
 
 	index := 0
 	for _, v := range m.Players {
@@ -153,16 +152,19 @@ func (m *Map) GetLeaderboard(topN int) []string {
 	}
 
 	sort.Slice(snakes, func(i, j int) bool {
-		return snakes[i].Length > snakes[j].Length
+		return snakes[i].Length < snakes[j].Length
 	})
 
 	for i, snake := range snakes {
-		leaderboard[i] = snake.Player.Client.Name
+		leaderboard[i] = NewLeaderboardMessage(m, snake)
 	}
 
 	return leaderboard
 }
 
+// What does using a tile as a fundemental game object look like. 
+// Maybe something like a Snakenode and a Food *are* tiles. And they
+// Dictate what they look like.
 func (m *Map) GetColor(tile *Tile) uint32 {
 	if tile.Food != nil {
 		return 0x00FF00
