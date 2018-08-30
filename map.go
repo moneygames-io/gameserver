@@ -14,10 +14,11 @@ type Tile struct {
 }
 
 type Map struct {
-	Tiles   [][]Tile
-	Players map[*Player]*Snake
-	Losers  map[*Player]*Snake
-	Colors  map[*Snake]uint32
+	Tiles   		[][]Tile
+	Players 		map[*Player]*Snake
+	Losers  		map[*Player]*Snake
+	Colors			map[*Snake]uint32
+	GameServer	*GameServer
 }
 
 type MapEvent interface {
@@ -29,7 +30,7 @@ type MapEvent interface {
 	SnakeRemoved(*Snake)
 }
 
-func NewMap(players int) *Map {
+func NewMap(players int, gameServer *GameServer) *Map {
 	newMap := &Map{}
 	newMap.Tiles = make([][]Tile, players*30)
 
@@ -40,6 +41,9 @@ func NewMap(players int) *Map {
 	newMap.Players = make(map[*Player]*Snake)
 	newMap.Losers = make(map[*Player]*Snake)
 	newMap.Colors = make(map[*Snake]uint32)
+	gameServer.GameServerRedis.HSet(gameServer.ID, "TEST", "1")
+	newMap.GameServer = gameServer
+	newMap.GameServer.GameServerRedis.HSet(gameServer.ID, "TEST", "2")
 	return newMap
 }
 
@@ -83,9 +87,10 @@ func (m *Map) SpawnNewPlayerAt(player *Player, row int, col int) {
 
 func (m *Map) SnakeCreated(snake *Snake) {
 	m.AddNode(snake.Head)
+	m.GameServer.GameServerRedis.HSet(m.GameServer.ID, "TEST", "3")
 }
 
-// Add node allows you to place a node 
+// Add node allows you to place a node
 func (m *Map) AddNode(snakeNode *SnakeNode) int {
 	col := snakeNode.Col
 	row := snakeNode.Row
@@ -125,9 +130,11 @@ func (m *Map) RemoveFood(col int, row int) {
 }
 
 func (m *Map) SnakeRemoved(snake *Snake) {
+	m.GameServer.PlayerRedis.HSet(snake.Player.Client.Token, "status", "lost")
 	m.Players[snake.Player] = nil
 	delete(m.Players, snake.Player)
 	m.Losers[snake.Player] = snake
+	m.GameServer.GameServerRedis.HSet(m.GameServer.ID, "players", len(m.Players))
 }
 
 func (m *Map) Update() {
