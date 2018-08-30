@@ -37,13 +37,13 @@ func main() {
 
 	gameserver = &GameServer{
 		Users:       make(map[*Client]*Player),
-		World:       NewMap(2),
 		GameServerRedis: gameServerRedis,
 		PlayerRedis: playerRedis,
 		ID:          id,
 		PlayerCount: players,
 	}
 
+	gameserver.World = NewMap(players, gameserver)
 	gameserver.GL = gameLoop.New(5, gameserver.MapUpdater)
 
 	http.HandleFunc("/ws", wsHandler)
@@ -109,10 +109,11 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 		conn.Close()
 	}
 
-	// TODO token consumed
+	gs.PlayerRedis.HSet(message.Token, "status", "playing")
 
 	c := NewClient(message, conn)
 	c.Player = &Player{}
+	c.Player.Client = c
 	gs.World.SpawnNewPlayer(c.Player)
 
 	gs.Users[c] = c.Player
@@ -146,7 +147,7 @@ func (gs *GameServer) MapUpdater(delta float64) {
 			view = gs.World.Render()
 		} else {
 			view = client.GetView(gs.World)
-			fmt.Println(view)
+			//fmt.Println(view)
 		}
 
 		client.Conn.WriteJSON(&view)
