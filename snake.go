@@ -56,7 +56,7 @@ func (snake *Snake) Sprint(direction int) {
 		snake.CurrentDirection = direction
 	}
 
-	status := snake.GrowHead()
+	status := snake.GrowHead() // TODO This is why sprint is not working
 
 	switch status {
 	case 0:
@@ -68,7 +68,6 @@ func (snake *Snake) Sprint(direction int) {
 	case 2:
 		snake.Dead()
 	}
-
 }
 
 func (snake *Snake) GrowHead() int {

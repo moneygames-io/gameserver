@@ -17,7 +17,6 @@ type Map struct {
 	Tiles         [][]Tile
 	Players       map[*Player]*Snake
 	Losers        map[*Player]*Snake
-	Colors        map[*Snake]uint32
 	FoodPerPlayer int
 }
 
@@ -41,7 +40,6 @@ func NewMap(players int, scalingFactor int, foodFactor int) *Map {
 
 	newMap.Players = make(map[*Player]*Snake)
 	newMap.Losers = make(map[*Player]*Snake)
-	newMap.Colors = make(map[*Snake]uint32)
 	return newMap
 }
 
@@ -139,61 +137,4 @@ func (m *Map) Update() {
 			snake.Move(player.CurrentDirection)
 		}
 	}
-}
-
-func (m *Map) GetLeaderboard(topN int) []LeaderboardMessage {
-	snakes := make([]*Snake, len(m.Players))
-	leaderboard := make([]LeaderboardMessage, len(m.Players))
-
-	index := 0
-	for _, v := range m.Players {
-		snakes[index] = v
-		index++
-	}
-
-	sort.Slice(snakes, func(i, j int) bool {
-		return snakes[i].Length < snakes[j].Length
-	})
-
-	for i, snake := range snakes {
-		leaderboard[i] = NewLeaderboardMessage(m, snake)
-	}
-
-	return leaderboard
-}
-
-// What does using a tile as a fundemental game object look like. 
-// Maybe something like a Snakenode and a Food *are* tiles. And they
-// Dictate what they look like.
-func (m *Map) GetColor(tile *Tile) uint32 {
-	if tile.Food != nil {
-		return 0x00FF00
-	}
-
-	if tile.Snake == nil {
-		return 0xF0F0F0
-	}
-
-	if val, ok := m.Colors[tile.Snake]; ok {
-		return val
-	}
-
-	m.Colors[tile.Snake] = rand.Uint32()
-	return m.Colors[tile.Snake]
-}
-
-func (m *Map) Render() [][]uint32 {
-	colors := make([][]uint32, len(m.Tiles))
-
-	for i := range m.Tiles {
-		colors[i] = make([]uint32, len(m.Tiles[i]))
-	}
-
-	for r := range m.Tiles {
-		for c := range m.Tiles[r] {
-			colors[r][c] = m.GetColor(&m.Tiles[r][c])
-		}
-	}
-
-	return colors
 }
