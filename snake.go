@@ -11,7 +11,6 @@ type Snake struct {
 	Head             *SnakeNode
 	Tail             *SnakeNode
 	Events           MapEvent
-	Token						 string
 }
 
 func NewSnake(row int, col int, events MapEvent, player ...*Player) *Snake {
@@ -26,7 +25,6 @@ func NewSnake(row int, col int, events MapEvent, player ...*Player) *Snake {
 	if len(player) > 0 {
 		s.Player = player[0]
 	}
-
 	return s
 }
 
