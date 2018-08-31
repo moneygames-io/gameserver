@@ -2,8 +2,8 @@ package main
 
 import (
 	"math/rand"
-	"sort"
 	"time"
+	"sort"
 
 	"github.com/Parth/boolean"
 )
@@ -137,4 +137,20 @@ func (m *Map) Update() {
 			snake.Move(player.CurrentDirection)
 		}
 	}
+}
+
+func (m *Map) SortSnakes() []*Snake {
+	snakes := make([]*Snake, len(m.Players))
+
+	index := 0
+	for _, v := range m.Players {
+		snakes[index] = v
+		index++
+	}
+
+	sort.Slice(snakes, func(i, j int) bool {
+		return snakes[i].Length < snakes[j].Length
+	})
+
+	return snakes
 }

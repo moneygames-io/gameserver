@@ -1,6 +1,6 @@
 package main
 
-type MinmapMessage struct {
+type MinimapMessage struct {
 	Row   int
 	Col   int
 	Color uint32

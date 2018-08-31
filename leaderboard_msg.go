@@ -1,17 +1,18 @@
 package main
 
 type LeaderboardMessage struct {
-	Rank   int
-	Name   string
-	Length int
-	Color  uint32
+	Rank   int    `json:"Rank"`
+	Name   string `json:"Name"`
+	Length int    `json:"Length"`
+	Color  uint32 `json: "Length"`
+	Snake  *Snake `json:"-"`
 }
 
-func NewLeaderboardMessage(rank int, m *Map, s *Snake) LeaderboardMessage {
+func NewLeaderboardMessage(rank int, gs *GameServer, s *Snake) LeaderboardMessage {
 	return LeaderboardMessage{
 		Name:   s.Player.Client.Name,
 		Length: s.Length,
-		Color: m.GetColor(&Tile{
+		Color: gs.GetColor(&Tile{
 			Snake: s,
 			Food:  nil,
 		}),

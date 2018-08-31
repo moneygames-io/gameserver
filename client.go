@@ -54,7 +54,7 @@ func (c *Client) GetPerspective(gs *GameServer) [][]uint32 {
 				col+c0 < 0 {
 				colors[row][col] = 0xFFFFFF
 			} else {
-				colors[row][col] = m.GetColor(&m.Tiles[row+r0][col+c0])
+				colors[row][col] = gs.GetColor(&m.Tiles[row+r0][col+c0])
 			}
 		}
 	}
@@ -62,20 +62,35 @@ func (c *Client) GetPerspective(gs *GameServer) [][]uint32 {
 	return colors
 }
 
-func (c *Client) GetMinimap(m *Map) [][][]int {
-	topSnakes := m.GetLeaderboardSnakes(10)
-	var minimap [][]int
-
-	for _, snake := range topSnakes {
-		current := snake.Head
-		for i := 0; i < snake.Length; i++ {
-			minimap = append(minimap, []int{current.Row, current.Col})
-			current = currrent.Next
-		}
+func (c *Client) GetMinimap(gs *GameServer) []MinimapMessage {
+	genericMinimap := gs.Minimap
+	current := c.Player.Snake.Head
+	for i := 0; i < c.Player.Snake.Length; i++ {
+		genericMinimap = append(genericMinimap, MinimapMessage{
+			Row:   current.Row,
+			Col:   current.Col,
+			Color: gs.GetColor(&gs.World.Tiles[current.Row][current.Col]),
+		})
+		current = current.Next
 	}
+	return genericMinimap
 }
 
 func (c *Client) GetLeaderboard(gs *GameServer) []LeaderboardMessage {
+	genericLeaderboard := gs.Leaderboard
+	clientSnake := c.Player.Snake
+	rank := 0
+	for index, lm := range genericLeaderboard {
+		if lm.Snake == clientSnake {
+			rank = index
+		}
+	}
+
+	if rank >= 10 {
+		return append(gs.Leaderboard[:10], NewLeaderboardMessage(rank, gs, clientSnake))
+	} else {
+		return gs.Leaderboard[:10]
+	}
 }
 
 func (c *Client) CollectInput(conn *websocket.Conn) {
@@ -95,6 +110,10 @@ func (c *Client) CollectInput(conn *websocket.Conn) {
 			return
 		}
 	}
+}
+
+func (c *Client) SendLeaderboard(gs *GameServer) {
+	c.Conn.WriteJSON(map[string][]LeaderboardMessage{"Leaderboard": gs.Leaderboard[:10]})
 }
 
 func (c *Client) SendCustomLeaderboard(gs *GameServer) {

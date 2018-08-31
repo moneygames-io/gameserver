@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"math/rand"
 	"time"
 
 	"github.com/go-redis/redis"
@@ -48,10 +49,10 @@ func main() {
 		PlayerCount:     players,
 	}
 
-	gameserver.SpectatorView = make([][]uint32, len(gs.World.Tiles))
+	gameserver.SpectatorView = make([][]uint32, len(gameserver.World.Tiles))
 
-	for i := range gs.World.Tiles {
-		gameserver.SpectatorView[i] = make([]uint32, len(gs.World.Tiles[i]))
+	for i := range gameserver.World.Tiles {
+		gameserver.SpectatorView[i] = make([]uint32, len(gameserver.World.Tiles[i]))
 	}
 
 	gameserver.GL = gameLoop.New(5, gameserver.MapUpdater)
@@ -151,21 +152,21 @@ func (gs *GameServer) MapUpdater(delta float64) {
 	gs.PublishState("game started")
 	gs.World.Update()
 	gs.CalculateSpectatorView()
-	gs.CalculateLeaderboard(10)
+	gs.CalculateLeaderboard()
 
 	for player := range gs.World.Players {
-		player.client.SendPerspective(gs)
-		player.client.SendCustomLeaderboard(gs)
+		player.Client.SendPerspective(gs)
+		player.Client.SendCustomLeaderboard(gs)
 		player.Client.SendCustomMinimap(gs)
 	}
 
-	for loser := range gs.World.Loser {
-		loser.client.SendSpectatorView(gs)
-		loser.client.SendCustomLeaderboard(gs)
-		loser.client.SendMinimap(gs)
+	for loser := range gs.World.Losers {
+		loser.Client.SendSpectatorView(gs)
+		loser.Client.SendLeaderboard(gs)
+		loser.Client.SendMinimap(gs)
 	}
 
-	for index, spectator := range gs.spectators {
+	for _, spectator := range gs.Spectators {
 		spectator.SendSpectatorView(gs)
 		spectator.SendLeaderboard(gs)
 		spectator.SendMinimap(gs)
@@ -178,31 +179,11 @@ func (gs *GameServer) MapUpdater(delta float64) {
 	}
 }
 
-func (gs *GameServer) GetTopSnakes(topN int, m *Map) []*Snake {
-	if topN < len(m.Players) {
-		topN = len(m.Players)
-	}
-
-	snakes := make([]*Snake, len(m.Players))
-
-	index := 0
-	for _, v := range m.Players {
-		snakes[index] = v
-		index++
-	}
-
-	sort.Slice(snakes, func(i, j int) bool {
-		return snakes[i].Length < snakes[j].Length
-	})
-
-	return snakes[0:topN]
-}
-
-func (gs *GameServer) CalculateLeaderboard(topN int) {
-	leaderboard := make([]LeaderboardMessage, topN)
-	snakes := m.GetTopSnakes(topN)
+func (gs *GameServer) CalculateLeaderboard() {
+	leaderboard := make([]LeaderboardMessage, len(gs.World.Players))
+	snakes := gs.World.SortSnakes()
 	for i, snake := range snakes {
-		leaderboard[i] = NewLeaderboardMessage(i, m, snake)
+		leaderboard[i] = NewLeaderboardMessage(i, gs, snake)
 	}
 
 	gs.Leaderboard = leaderboard
@@ -228,29 +209,27 @@ func (gs *GameServer) GetColor(tile *Tile) uint32 {
 	return gs.Colors[tile.Snake]
 }
 
-func (gs *GameServer) CalculateSpectatorView() [][]uint32 {
+func (gs *GameServer) CalculateSpectatorView() {
 	for r := range gs.World.Tiles {
 		for c := range gs.World.Tiles[r] {
-			gs.SpectatorView[r][c] = gs.World.GetColor(&gs.World.Tiles[r][c])
+			gs.SpectatorView[r][c] = gs.GetColor(&gs.World.Tiles[r][c])
 		}
 	}
-
-	return colors
 }
 
-func (gs *GameServer) CalculateMinimap(int topN) []MinimapMessage {
-	topSnakes := m.GetTopSnakes(10)
+func (gs *GameServer) CalculateMinimap() {
+	topSnakes := gs.World.SortSnakes()[:10]
 	var minimap []MinimapMessage // TODO Convert to minimapmessage
 
 	for _, snake := range topSnakes {
 		current := snake.Head
 		for i := 0; i < snake.Length; i++ {
 			minimap = append(minimap, MinimapMessage{
-				Row: current.Row,
-				Col: current.Col,
-				Color: gs.GetColor(gs.World.Tiles[current.Row][current.Col])
+				Row:   current.Row,
+				Col:   current.Col,
+				Color: gs.GetColor(&gs.World.Tiles[current.Row][current.Col]),
 			})
-			current = currrent.Next
+			current = current.Next
 		}
 	}
 	gs.Minimap = minimap
