@@ -1,8 +1,8 @@
-// TODO Standardize between row/col and x/y across the app
 package main
 
 import (
 	"math/rand"
+	"sort"
 	"time"
 
 	"github.com/Parth/boolean"
@@ -14,10 +14,10 @@ type Tile struct {
 }
 
 type Map struct {
-	Tiles   [][]Tile
-	Players map[*Player]*Snake
-	Losers  map[*Player]*Snake
-	Colors  map[*Snake]uint32
+	Tiles         [][]Tile
+	Players       map[*Player]*Snake
+	Losers        map[*Player]*Snake
+	FoodPerPlayer int
 }
 
 type MapEvent interface {
@@ -29,17 +29,17 @@ type MapEvent interface {
 	SnakeRemoved(*Snake)
 }
 
-func NewMap(players int) *Map {
+func NewMap(players int, scalingFactor int, foodFactor int) *Map {
 	newMap := &Map{}
-	newMap.Tiles = make([][]Tile, players*30)
+	newMap.Tiles = make([][]Tile, players*scalingFactor)
+	newMap.FoodPerPlayer = foodFactor
 
 	for i := range newMap.Tiles {
-		newMap.Tiles[i] = make([]Tile, players*30)
+		newMap.Tiles[i] = make([]Tile, players*scalingFactor)
 	}
 
 	newMap.Players = make(map[*Player]*Snake)
 	newMap.Losers = make(map[*Player]*Snake)
-	newMap.Colors = make(map[*Snake]uint32)
 	return newMap
 }
 
@@ -53,7 +53,7 @@ func (m *Map) SpawnNewPlayer(player *Player) (int, int) {
 		col = rand.Intn(len(m.Tiles[0]))
 	}
 
-	m.SpawnFood(20)
+	m.SpawnFood(m.FoodPerPlayer)
 
 	m.SpawnNewPlayerAt(player, row, col)
 	return row, col
@@ -85,7 +85,6 @@ func (m *Map) SnakeCreated(snake *Snake) {
 	m.AddNode(snake.Head)
 }
 
-// Add node allows you to place a node 
 func (m *Map) AddNode(snakeNode *SnakeNode) int {
 	col := snakeNode.Col
 	row := snakeNode.Row
@@ -140,35 +139,30 @@ func (m *Map) Update() {
 	}
 }
 
-func (m *Map) GetColor(tile *Tile) uint32 {
-	if tile.Food != nil {
-		return 0x00FF00
+func (m *Map) SortSnakes() []*Snake {
+	snakes := make([]*Snake, len(m.Players))
+
+	index := 0
+	for _, v := range m.Players {
+		snakes[index] = v
+		index++
 	}
 
-	if tile.Snake == nil {
-		return 0xF0F0F0
-	}
+	sort.Slice(snakes, func(i, j int) bool {
+		return snakes[i].Length > snakes[j].Length
+	})
 
-	if val, ok := m.Colors[tile.Snake]; ok {
-		return val
-	}
-
-	m.Colors[tile.Snake] = rand.Uint32()
-	return m.Colors[tile.Snake]
+	return snakes
 }
 
-func (m *Map) Render() [][]uint32 {
-	colors := make([][]uint32, len(m.Tiles))
+func (m *Map) GetSnakeRank(s *Snake) int {
+	snakes := m.SortSnakes()
 
-	for i := range m.Tiles {
-		colors[i] = make([]uint32, len(m.Tiles[i]))
-	}
-
-	for r := range m.Tiles {
-		for c := range m.Tiles[r] {
-			colors[r][c] = m.GetColor(&m.Tiles[r][c])
+	for i, v := range snakes {
+		if v == s {
+			return i
 		}
 	}
 
-	return colors
+	return -1
 }

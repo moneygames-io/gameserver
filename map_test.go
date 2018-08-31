@@ -23,7 +23,7 @@ func printMap(m *Map) {
 }
 
 func TestNewMap(t *testing.T) {
-	m := NewMap(1)
+	m := NewMap(1, 10, 2)
 	assert.NotNil(t, m)
 	assert.NotNil(t, m.Tiles)
 	assert.NotNil(t, m.Players)
@@ -35,7 +35,7 @@ func TestNewMap(t *testing.T) {
 }
 
 func TestPlayerSpawning(t *testing.T) {
-	m := NewMap(1)
+	m := NewMap(1, 10, 2)
 	p := &Player{0, false, nil, nil}
 	row, col := m.SpawnNewPlayer(p)
 	assert.NotNil(t, m.Tiles[row][col].Snake)
@@ -66,7 +66,7 @@ func TestPlayerSpawning(t *testing.T) {
 }
 
 func TestPlayerMovement0ToEdge(t *testing.T) {
-	m := NewMap(1)
+	m := NewMap(1, 10, 2)
 	p := &Player{0, false, nil, nil}
 	row, col := m.SpawnNewPlayer(p)
 
@@ -87,7 +87,7 @@ func TestPlayerMovement0ToEdge(t *testing.T) {
 }
 
 func TestPlayerMovement1ToEdge(t *testing.T) {
-	m := NewMap(1)
+	m := NewMap(1, 10, 2)
 	p := &Player{0, false, nil, nil}
 	row, col := m.SpawnNewPlayer(p)
 
@@ -108,7 +108,7 @@ func TestPlayerMovement1ToEdge(t *testing.T) {
 }
 
 func TestPlayerMovement2ToEdge(t *testing.T) {
-	m := NewMap(1)
+	m := NewMap(1, 10, 2)
 	p := &Player{0, false, nil, nil}
 	row, col := m.SpawnNewPlayer(p)
 
@@ -129,7 +129,7 @@ func TestPlayerMovement2ToEdge(t *testing.T) {
 }
 
 func TestPlayerMovement3ToEdge(t *testing.T) {
-	m := NewMap(1)
+	m := NewMap(1, 10, 2)
 	p := &Player{0, false, nil, nil}
 	row, col := m.SpawnNewPlayer(p)
 
@@ -149,7 +149,7 @@ func TestPlayerMovement3ToEdge(t *testing.T) {
 }
 
 func TestFoodDynamics(t *testing.T) {
-	m := NewMap(1)
+	m := NewMap(1, 10, 2)
 	p := &Player{0, false, nil, nil}
 	m.SpawnNewPlayerAt(p, 3, 3)
 	m.AddFood(&Food{5, 3})
@@ -187,7 +187,7 @@ func TestFoodDynamics(t *testing.T) {
 }
 
 func TestMultiPlayerDynamics(t *testing.T) {
-	m := NewMap(3)
+	m := NewMap(3, 10, 2)
 	p1 := &Player{0, false, nil, nil}
 	p2 := &Player{0, false, nil, nil}
 	p3 := &Player{0, false, nil, nil}

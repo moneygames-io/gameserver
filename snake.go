@@ -56,7 +56,7 @@ func (snake *Snake) Sprint(direction int) {
 		snake.CurrentDirection = direction
 	}
 
-	status := snake.GrowHead()
+	status := snake.GrowHead() // TODO This is why sprint is not working
 
 	switch status {
 	case 0:
@@ -68,7 +68,6 @@ func (snake *Snake) Sprint(direction int) {
 	case 2:
 		snake.Dead()
 	}
-
 }
 
 func (snake *Snake) GrowHead() int {
@@ -84,7 +83,6 @@ func (snake *Snake) GrowHead() int {
 
 	status := snake.Events.AddNode(newHead)
 
-	// Was it added?
 	if status != 2 {
 		oldHead.Prev = newHead
 
@@ -96,7 +94,7 @@ func (snake *Snake) GrowHead() int {
 }
 
 func (snake *Snake) ShortenTail(howMuch int) *SnakeNode {
-	if snake.Length == 1 { // no tail left
+	if snake.Length == 1 {
 		return nil
 	}
 	oldTail := snake.Tail
@@ -109,7 +107,7 @@ func (snake *Snake) ShortenTail(howMuch int) *SnakeNode {
 
 	snake.Events.RemoveNode(oldTail.Row, oldTail.Col)
 
-	if howMuch > 1 { // more tail to get rid off
+	if howMuch > 1 {
 		return snake.ShortenTail(howMuch - 1)
 	} else {
 		return oldTail

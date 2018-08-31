@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -14,12 +15,18 @@ import (
 
 type GameServer struct {
 	Users           map[*Client]*Player
+	Colors          map[*Snake]uint32
 	World           *Map
 	GameServerRedis *redis.Client
 	PlayerRedis     *redis.Client
 	ID              string
 	GL              *gameLoop.GameLoop
 	PlayerCount     int
+	SpectatorView   [][]uint32
+	Leaderboard     []LeaderboardMessage
+	Spectators      []*Client
+	Minimap         []MinimapMessage
+	LeaderboardSize int
 }
 
 var gameserver *GameServer
@@ -33,15 +40,26 @@ func main() {
 
 	players := getPlayers(id, gameServerRedis)
 
-	fmt.Println(players)
-
 	gameserver = &GameServer{
-		Users:       make(map[*Client]*Player),
-		World:       NewMap(2),
+		Users:           make(map[*Client]*Player),
+		Colors:          make(map[*Snake]uint32),
+		World:           NewMap(players, 30, 20),
 		GameServerRedis: gameServerRedis,
-		PlayerRedis: playerRedis,
-		ID:          id,
-		PlayerCount: players,
+		PlayerRedis:     playerRedis,
+		ID:              id,
+		PlayerCount:     players,
+	}
+
+	if gameserver.PlayerCount < 10 {
+		gameserver.LeaderboardSize = gameserver.PlayerCount
+	} else {
+		gameserver.LeaderboardSize = 10
+	}
+
+	gameserver.SpectatorView = make([][]uint32, len(gameserver.World.Tiles))
+
+	for i := range gameserver.World.Tiles {
+		gameserver.SpectatorView[i] = make([]uint32, len(gameserver.World.Tiles[i]))
 	}
 
 	gameserver.GL = gameLoop.New(5, gameserver.MapUpdater)
@@ -104,31 +122,33 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 
 	error := conn.ReadJSON(message)
 
-	if error != nil || !validateToken(message.Token, gs.PlayerRedis) {
-		fmt.Println("Closing connection, token invalid", error, message)
-		conn.Close()
-	}
+	if error == nil && validateToken(message.Token, gs.PlayerRedis) {
+		c := NewClient(message, conn)
+		c.Player = &Player{}
+		gs.World.SpawnNewPlayer(c.Player)
+		c.Player.Client = c
 
-	// TODO token consumed
+		gs.Users[c] = c.Player
+		go c.CollectInput(conn)
 
-	c := NewClient(message, conn)
-	c.Player = &Player{}
-	gs.World.SpawnNewPlayer(c.Player)
-
-	gs.Users[c] = c.Player
-	go c.CollectInput(conn)
-
-	fmt.Println(len(gs.Users), gs.PlayerCount)
-	if len(gs.Users) >= gs.PlayerCount && gs.GL.Running == false {
-		gs.GL.Start()
-		fmt.Println("started")
+		fmt.Println(len(gs.Users), gs.PlayerCount)
+		if len(gs.Users) >= gs.PlayerCount && gs.GL.Running == false {
+			gs.GL.Start()
+			fmt.Println("started")
+		}
+	} else {
+		gs.Spectators = append(gs.Spectators, NewClient(nil, conn))
 	}
 }
 
+// TODO OOP?
 func validateToken(token string, playerRedis *redis.Client) bool {
 	status, _ := playerRedis.HGet(token, "status").Result()
-	fmt.Println(status)
-	return status == "paid"
+	if status == "paid" {
+		playerRedis.HSet(token, "status", "in game")
+		return true
+	}
+	return false
 }
 
 func (gs *GameServer) PublishState(msg string) {
@@ -138,18 +158,26 @@ func (gs *GameServer) PublishState(msg string) {
 func (gs *GameServer) MapUpdater(delta float64) {
 	gs.PublishState("game started")
 	gs.World.Update()
+	gs.CalculateLeaderboard()
+	gs.CalculateSpectatorView()
+	gs.CalculateMinimap()
 
-	for client := range gs.Users {
-		var view [][]uint32
+	for player := range gs.World.Players {
+		player.Client.SendPerspective(gs)
+		player.Client.SendCustomLeaderboard(gs)
+		player.Client.SendCustomMinimap(gs)
+	}
 
-		if _, ok := gs.World.Losers[client.Player]; ok {
-			view = gs.World.Render()
-		} else {
-			view = client.GetView(gs.World)
-			fmt.Println(view)
-		}
+	for loser := range gs.World.Losers {
+		loser.Client.SendSpectatorView(gs)
+		loser.Client.SendLeaderboard(gs)
+		loser.Client.SendMinimap(gs)
+	}
 
-		client.Conn.WriteJSON(&view)
+	for _, spectator := range gs.Spectators {
+		spectator.SendSpectatorView(gs)
+		spectator.SendLeaderboard(gs)
+		spectator.SendMinimap(gs)
 	}
 
 	if len(gs.World.Players) == 1 {
@@ -157,6 +185,71 @@ func (gs *GameServer) MapUpdater(delta float64) {
 		gs.PublishState("game finished")
 		os.Exit(0)
 	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
+func (gs *GameServer) CalculateLeaderboard() {
+	gs.LeaderboardSize = min(min(gs.PlayerCount, len(gs.World.Players)), 10)
+	leaderboard := make([]LeaderboardMessage, len(gs.World.Players))
+	snakes := gs.World.SortSnakes()
+	for i, snake := range snakes {
+		leaderboard[i] = NewLeaderboardMessage(i, gs, snake)
+	}
+
+	gs.Leaderboard = leaderboard
+}
+
+// What does using a tile as a fundemental game object look like.
+// Maybe something like a Snakenode and a Food *are* tiles. And they
+// Dictate what they look like.
+func (gs *GameServer) GetColor(tile *Tile) uint32 {
+	if tile.Food != nil {
+		return 0x00FF00
+	}
+
+	if tile.Snake == nil {
+		return 0xF0F0F0
+	}
+
+	if val, ok := gs.Colors[tile.Snake]; ok {
+		return val
+	}
+
+	gs.Colors[tile.Snake] = rand.Uint32()
+	return gs.Colors[tile.Snake]
+}
+
+func (gs *GameServer) CalculateSpectatorView() {
+	for r := range gs.World.Tiles {
+		for c := range gs.World.Tiles[r] {
+			gs.SpectatorView[r][c] = gs.GetColor(&gs.World.Tiles[r][c])
+		}
+	}
+}
+
+func (gs *GameServer) CalculateMinimap() {
+	topSnakes := gs.World.SortSnakes()[:gs.LeaderboardSize]
+	var minimap []MinimapMessage // TODO Convert to minimapmessage
+
+	for _, snake := range topSnakes {
+		current := snake.Head
+		for i := 0; i < snake.Length; i++ {
+			minimap = append(minimap, MinimapMessage{
+				Row:   current.Row,
+				Col:   current.Col,
+				Color: gs.GetColor(&gs.World.Tiles[current.Row][current.Col]),
+			})
+			current = current.Next
+		}
+	}
+	gs.Minimap = minimap
 }
 
 func (gs *GameServer) PostGame() {
