@@ -10,6 +10,7 @@ type LeaderboardMessage struct {
 
 func NewLeaderboardMessage(rank int, gs *GameServer, s *Snake) LeaderboardMessage {
 	return LeaderboardMessage{
+		Rank:   rank,
 		Name:   s.Player.Client.Name,
 		Length: s.Length,
 		Color: gs.GetColor(&Tile{

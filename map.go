@@ -2,8 +2,8 @@ package main
 
 import (
 	"math/rand"
-	"time"
 	"sort"
+	"time"
 
 	"github.com/Parth/boolean"
 )
@@ -149,8 +149,20 @@ func (m *Map) SortSnakes() []*Snake {
 	}
 
 	sort.Slice(snakes, func(i, j int) bool {
-		return snakes[i].Length < snakes[j].Length
+		return snakes[i].Length > snakes[j].Length
 	})
 
 	return snakes
+}
+
+func (m *Map) GetSnakeRank(s *Snake) int {
+	snakes := m.SortSnakes()
+
+	for i, v := range snakes {
+		if v == s {
+			return i
+		}
+	}
+
+	return -1
 }

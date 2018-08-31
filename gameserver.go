@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
-	"math/rand"
 	"time"
 
 	"github.com/go-redis/redis"
@@ -26,6 +26,7 @@ type GameServer struct {
 	Leaderboard     []LeaderboardMessage
 	Spectators      []*Client
 	Minimap         []MinimapMessage
+	LeaderboardSize int
 }
 
 var gameserver *GameServer
@@ -47,6 +48,12 @@ func main() {
 		PlayerRedis:     playerRedis,
 		ID:              id,
 		PlayerCount:     players,
+	}
+
+	if gameserver.PlayerCount < 10 {
+		gameserver.LeaderboardSize = gameserver.PlayerCount
+	} else {
+		gameserver.LeaderboardSize = 10
 	}
 
 	gameserver.SpectatorView = make([][]uint32, len(gameserver.World.Tiles))
@@ -151,8 +158,9 @@ func (gs *GameServer) PublishState(msg string) {
 func (gs *GameServer) MapUpdater(delta float64) {
 	gs.PublishState("game started")
 	gs.World.Update()
-	gs.CalculateSpectatorView()
 	gs.CalculateLeaderboard()
+	gs.CalculateSpectatorView()
+	gs.CalculateMinimap()
 
 	for player := range gs.World.Players {
 		player.Client.SendPerspective(gs)
@@ -179,7 +187,16 @@ func (gs *GameServer) MapUpdater(delta float64) {
 	}
 }
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
 func (gs *GameServer) CalculateLeaderboard() {
+	gs.LeaderboardSize = min(min(gs.PlayerCount, len(gs.World.Players)), 10)
 	leaderboard := make([]LeaderboardMessage, len(gs.World.Players))
 	snakes := gs.World.SortSnakes()
 	for i, snake := range snakes {
@@ -218,7 +235,7 @@ func (gs *GameServer) CalculateSpectatorView() {
 }
 
 func (gs *GameServer) CalculateMinimap() {
-	topSnakes := gs.World.SortSnakes()[:10]
+	topSnakes := gs.World.SortSnakes()[:gs.LeaderboardSize]
 	var minimap []MinimapMessage // TODO Convert to minimapmessage
 
 	for _, snake := range topSnakes {

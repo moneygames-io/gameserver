@@ -65,31 +65,29 @@ func (c *Client) GetPerspective(gs *GameServer) [][]uint32 {
 func (c *Client) GetMinimap(gs *GameServer) []MinimapMessage {
 	genericMinimap := gs.Minimap
 	current := c.Player.Snake.Head
-	for i := 0; i < c.Player.Snake.Length; i++ {
-		genericMinimap = append(genericMinimap, MinimapMessage{
-			Row:   current.Row,
-			Col:   current.Col,
-			Color: gs.GetColor(&gs.World.Tiles[current.Row][current.Col]),
-		})
-		current = current.Next
+
+	if gs.World.GetSnakeRank(c.Player.Snake) >= gs.LeaderboardSize {
+		for i := 0; i < c.Player.Snake.Length; i++ {
+			genericMinimap = append(genericMinimap, MinimapMessage{
+				Row:   current.Row,
+				Col:   current.Col,
+				Color: gs.GetColor(&gs.World.Tiles[current.Row][current.Col]),
+			})
+			current = current.Next
+		}
 	}
 	return genericMinimap
+
 }
 
 func (c *Client) GetLeaderboard(gs *GameServer) []LeaderboardMessage {
-	genericLeaderboard := gs.Leaderboard
 	clientSnake := c.Player.Snake
-	rank := 0
-	for index, lm := range genericLeaderboard {
-		if lm.Snake == clientSnake {
-			rank = index
-		}
-	}
+	rank := gs.World.GetSnakeRank(clientSnake)
 
-	if rank >= 10 {
-		return append(gs.Leaderboard[:10], NewLeaderboardMessage(rank, gs, clientSnake))
+	if rank >= gs.LeaderboardSize {
+		return append(gs.Leaderboard[:gs.LeaderboardSize], NewLeaderboardMessage(rank, gs, clientSnake))
 	} else {
-		return gs.Leaderboard[:10]
+		return gs.Leaderboard[:gs.LeaderboardSize]
 	}
 }
 
@@ -113,15 +111,34 @@ func (c *Client) CollectInput(conn *websocket.Conn) {
 }
 
 func (c *Client) SendLeaderboard(gs *GameServer) {
-	c.Conn.WriteJSON(map[string][]LeaderboardMessage{"Leaderboard": gs.Leaderboard[:10]})
+	c.Conn.WriteJSON(map[string][]LeaderboardMessage{"Leaderboard": gs.Leaderboard[:gs.LeaderboardSize]})
 }
 
 func (c *Client) SendCustomLeaderboard(gs *GameServer) {
 	c.Conn.WriteJSON(map[string][]LeaderboardMessage{"Leaderboard": c.GetLeaderboard(gs)})
 }
 
+type MinimapWrapper struct {
+	Minimap []MinimapMessage
+	Rows    int
+	Cols    int
+}
+
 func (c *Client) SendCustomMinimap(gs *GameServer) {
-	c.Conn.WriteJSON(map[string][]MinimapMessage{"Minimap": c.GetMinimap(gs)})
+	c.Conn.WriteJSON(map[string]MinimapWrapper{"Minimap": MinimapWrapper{
+		Minimap: c.GetMinimap(gs),
+		Rows:    len(gs.World.Tiles),
+		Cols:    len(gs.World.Tiles[0]),
+	}})
+}
+
+func (c *Client) SendMinimap(gs *GameServer) {
+	c.Conn.WriteJSON(map[string]MinimapWrapper{"Minimap": MinimapWrapper{
+		Minimap: gs.Minimap,
+		Rows:    len(gs.World.Tiles),
+		Cols:    len(gs.World.Tiles[0]),
+	}})
+	c.Conn.WriteJSON(map[string][]MinimapMessage{"Minimap": gs.Minimap})
 }
 
 func (c *Client) SendPerspective(gs *GameServer) {
@@ -130,8 +147,4 @@ func (c *Client) SendPerspective(gs *GameServer) {
 
 func (c *Client) SendSpectatorView(gs *GameServer) {
 	c.Conn.WriteJSON(map[string][][]uint32{"Perspective": gs.SpectatorView})
-}
-
-func (c *Client) SendMinimap(gs *GameServer) {
-	c.Conn.WriteJSON(map[string][]MinimapMessage{"Minimap": gs.Minimap})
 }
