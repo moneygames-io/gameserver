@@ -18,6 +18,7 @@ type Map struct {
 	Players       map[*Player]*Snake
 	Losers        map[*Player]*Snake
 	FoodPerPlayer int
+	GameServer    *GameServer
 }
 
 type MapEvent interface {
@@ -127,6 +128,9 @@ func (m *Map) SnakeRemoved(snake *Snake) {
 	m.Players[snake.Player] = nil
 	delete(m.Players, snake.Player)
 	m.Losers[snake.Player] = snake
+	if gameserver != nil {
+		gameserver.ClientLost(snake.Player.Client)
+	}
 }
 
 func (m *Map) Update() {
