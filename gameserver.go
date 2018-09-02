@@ -50,6 +50,8 @@ func main() {
 		PlayerCount:     players,
 	}
 
+	gameserver.World.GameServer = gameserver
+
 	if gameserver.PlayerCount < 10 {
 		gameserver.LeaderboardSize = gameserver.PlayerCount
 	} else {
@@ -193,6 +195,11 @@ func min(a, b int) int {
 	}
 
 	return b
+}
+
+func (gs *GameServer) ClientLost(client *Client){
+	gs.PlayerRedis.HSet(client.Token, "status", "lost")
+	gs.GameServerRedis.HSet(gs.ID, "players", len(gs.World.Players))
 }
 
 func (gs *GameServer) CalculateLeaderboard() {
