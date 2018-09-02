@@ -185,7 +185,7 @@ func (gs *GameServer) MapUpdater(delta float64) {
 	if len(gs.World.Players) == 1 {
 		gs.PostGame()
 		gs.PublishState("game finished")
-		for player,_ := range gs.World.Players{
+		for player, _ := range gs.World.Players {
 			gs.ClientWon(player.Client)
 		}
 		os.Exit(0)
@@ -200,11 +200,11 @@ func min(a, b int) int {
 	return b
 }
 
-func (gs* GameServer) ClientWon(client *Client){
+func (gs *GameServer) ClientWon(client *Client) {
 	gs.PlayerRedis.HSet(client.Token, "status", "won")
 }
 
-func (gs *GameServer) ClientLost(client *Client){
+func (gs *GameServer) ClientLost(client *Client) {
 	gs.PlayerRedis.HSet(client.Token, "status", "lost")
 	gs.GameServerRedis.HSet(gs.ID, "players", len(gs.World.Players))
 }

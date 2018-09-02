@@ -18,7 +18,7 @@ type Map struct {
 	Players       map[*Player]*Snake
 	Losers        map[*Player]*Snake
 	FoodPerPlayer int
-	GameServer		*GameServer
+	GameServer    *GameServer
 }
 
 type MapEvent interface {
