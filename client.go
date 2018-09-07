@@ -138,7 +138,6 @@ func (c *Client) SendMinimap(gs *GameServer) {
 		Rows:    len(gs.World.Tiles),
 		Cols:    len(gs.World.Tiles[0]),
 	}})
-	c.Conn.WriteJSON(map[string][]MinimapMessage{"Minimap": gs.Minimap})
 }
 
 func (c *Client) SendPerspective(gs *GameServer) {
