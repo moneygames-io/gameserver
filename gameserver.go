@@ -136,7 +136,7 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 
 	error := conn.ReadJSON(message)
 
-	if error == nil && validateToken(message.Token, gs.PlayerRedis) {
+	if error == nil && message.Token != "spectating" && validateToken(message.Token, gs.PlayerRedis) {
 		c := NewClient(message, conn)
 		c.Status = "in game"
 		c.Player = &Player{}
@@ -152,7 +152,9 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 			gs.GL.Start()
 			fmt.Println("started")
 		}
-	} else {
+	}
+
+	if message.Token == "spectating" {
 		gs.Spectators = append(gs.Spectators, NewClient(nil, conn))
 	}
 }
