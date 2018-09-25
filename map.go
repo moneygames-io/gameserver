@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"math/rand"
 	"sort"
 	"time"
@@ -32,7 +33,7 @@ type MapEvent interface {
 
 func NewMap(players int, scalingFactor int, foodFactor int) *Map {
 	newMap := &Map{}
-	newMap.Tiles = make([][]Tile, players*scalingFactor)
+	newMap.Tiles = make([][]Tile, int(math.Sqrt(float64(players)))*scalingFactor)
 	newMap.FoodPerPlayer = foodFactor
 
 	for i := range newMap.Tiles {
