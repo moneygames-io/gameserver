@@ -43,7 +43,7 @@ func main() {
 	gameserver = &GameServer{
 		Users:           make(map[*Client]*Player),
 		Colors:          make(map[*Snake]uint32),
-		World:           NewMap(players, 30, 20),
+		World:           NewMap(players, 20, 90),
 		GameServerRedis: gameServerRedis,
 		PlayerRedis:     playerRedis,
 		ID:              id,
