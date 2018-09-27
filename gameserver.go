@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis"
+	"github.com/gonum/stat"
 	"github.com/gorilla/websocket"
 	"github.com/parth/go-gameloop"
 )
@@ -159,7 +160,16 @@ func (gs *GameServer) PublishState(msg string) {
 	gs.GameServerRedis.HSet(gs.ID, "status", msg)
 }
 
+var currentTime = time.Now()
+var frameTime = time.Since(currentTime) / time.Millisecond
+var times = []float64{}
+
 func (gs *GameServer) MapUpdater(delta float64) {
+	frameTime = time.Since(currentTime) / time.Millisecond
+	times = append(times, float64(frameTime))
+	fmt.Println(stat.MeanStdDev(times, nil))
+	currentTime = time.Now()
+
 	gs.PublishState("game started")
 	gs.World.Update()
 	gs.CalculateLeaderboard()
