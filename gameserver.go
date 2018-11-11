@@ -136,7 +136,7 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 
 	error := conn.ReadJSON(message)
 
-	if error == nil && message.Token != "spectating" && validateToken(message.Token, gs.PlayerRedis) {
+	if error == nil && message.Token != "spectating" && validateToken(message.Token, gs.ID, gs.PlayerRedis) {
 		c := NewClient(message, conn)
 		c.Status = "in game"
 		c.Player = &Player{}
@@ -160,10 +160,11 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 }
 
 // TODO OOP?
-func validateToken(token string, playerRedis *redis.Client) bool {
+func validateToken(token string, gameserverid string, playerRedis *redis.Client) bool {
 	status, _ := playerRedis.HGet(token, "status").Result()
 	if status == "paid" {
 		playerRedis.HSet(token, "status", "in game")
+		playerRedis.HSet(token, "game", gameserverid)
 		return true
 	}
 	return false
