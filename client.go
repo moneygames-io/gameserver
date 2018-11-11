@@ -12,6 +12,7 @@ type Client struct {
 	Conn             *websocket.Conn
 	Player           *Player
 	Spectator        bool
+	Status           string
 }
 
 func NewClient(r *RegisterMessage, conn *websocket.Conn) *Client {
@@ -146,4 +147,12 @@ func (c *Client) SendPerspective(gs *GameServer) {
 
 func (c *Client) SendSpectatorView(gs *GameServer) {
 	c.Conn.WriteJSON(map[string][][]uint32{"Perspective": gs.SpectatorView})
+}
+
+func (c *Client) SendStatus(gs *GameServer) {
+	c.Conn.WriteJSON(map[string]string{"status": c.Status})
+}
+
+func (c *Client) SendPot(gs *GameServer) {
+	c.Conn.WriteJSON(map[string]int{"pot": gs.Pot})
 }

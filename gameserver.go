@@ -23,6 +23,7 @@ type GameServer struct {
 	ID              string
 	GL              *gameLoop.GameLoop
 	PlayerCount     int
+	Pot             int
 	SpectatorView   [][]uint32
 	Leaderboard     []LeaderboardMessage
 	Spectators      []*Client
@@ -40,6 +41,7 @@ func main() {
 	gameServerRedis.HSet(id, "status", "idle")
 
 	players := getPlayers(id, gameServerRedis)
+	pot := getPot(id, gameServerRedis)
 
 	gameserver = &GameServer{
 		Users:           make(map[*Client]*Player),
@@ -49,6 +51,7 @@ func main() {
 		PlayerRedis:     playerRedis,
 		ID:              id,
 		PlayerCount:     players,
+		Pot:             pot,
 	}
 
 	gameserver.World.GameServer = gameserver
@@ -85,6 +88,15 @@ func getPlayers(id string, gameServerRedis *redis.Client) int {
 	}
 
 	return 0
+}
+
+func getPot(id string, gameServerRedis *redis.Client) int {
+	potString, err := gameServerRedis.HGet(id, "pot").Result()
+	if err != nil {
+		return 0
+	}
+	pot, _ := strconv.Atoi(potString)
+	return pot
 }
 
 func connectToRedis(addr string) *redis.Client {
@@ -125,11 +137,13 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 
 	error := conn.ReadJSON(message)
 
-	if error == nil && message.Token != "spectating" && validateToken(message.Token, gs.PlayerRedis) {
+	if error == nil && message.Token != "spectating" && validateToken(message.Token, gs.ID, gs.PlayerRedis) {
 		c := NewClient(message, conn)
+		c.Status = "in game"
 		c.Player = &Player{}
 		gs.World.SpawnNewPlayer(c.Player)
 		c.Player.Client = c
+		c.SendPot(gs)
 
 		gs.Users[c] = c.Player
 		go c.CollectInput(conn)
@@ -147,10 +161,11 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 }
 
 // TODO OOP?
-func validateToken(token string, playerRedis *redis.Client) bool {
+func validateToken(token string, gameserverid string, playerRedis *redis.Client) bool {
 	status, _ := playerRedis.HGet(token, "status").Result()
 	if status == "paid" {
 		playerRedis.HSet(token, "status", "in game")
+		playerRedis.HSet(token, "game", gameserverid)
 		return true
 	}
 	return false
@@ -213,10 +228,13 @@ func min(a, b int) int {
 }
 
 func (gs *GameServer) ClientWon(client *Client) {
+	client.Status = "won"
 	gs.PlayerRedis.HSet(client.Token, "status", "won")
+	client.SendStatus(gs)
 }
 
 func (gs *GameServer) ClientLost(client *Client) {
+	client.Status = "lost"
 	gs.PlayerRedis.HSet(client.Token, "status", "lost")
 	gs.GameServerRedis.HSet(gs.ID, "players", len(gs.World.Players))
 }
