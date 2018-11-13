@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"time"
+	"sync"
 
 	"github.com/go-redis/redis"
 	"github.com/gonum/stat"
@@ -29,6 +30,7 @@ type GameServer struct {
 	Spectators      []*Client
 	Minimap         []MinimapMessage
 	LeaderboardSize int
+	Mutex *sync.Mutex
 }
 
 var gameserver *GameServer
@@ -42,7 +44,7 @@ func main() {
 
 	players := getPlayers(id, gameServerRedis)
 	pot := getPot(id, gameServerRedis)
-
+	mutex := &sync.Mutex{}
 	gameserver = &GameServer{
 		Users:           make(map[*Client]*Player),
 		Colors:          make(map[*Snake]uint32),
@@ -52,6 +54,7 @@ func main() {
 		ID:              id,
 		PlayerCount:     players,
 		Pot:             pot,
+		Mutex: mutex,
 	}
 
 	gameserver.World.GameServer = gameserver
@@ -137,7 +140,20 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 
 	error := conn.ReadJSON(message)
 
-	if error == nil && message.Token != "spectating" && validateToken(message.Token, gs.ID, gs.PlayerRedis) {
+	if error == nil && message.Token != "spectating" && validateToken(message.Token, gs.PlayerRedis) {
+		gs.PlayerRedis.HSet(message.Token, "game", gs.ID)
+
+		gs.Mutex.Lock()
+		gs.GameServerRedis.SAdd(gs.ID+"-players", message.Token)
+		potString, _ := gs.GameServerRedis.HGet(gs.ID, "pot").Result()
+		unconfirmedString, _ := gs.PlayerRedis.HGet(message.Token, "unconfirmed").Result()
+		pot, _ := strconv.Atoi(potString)
+		unconfirmed, _ := strconv.Atoi(unconfirmedString)
+		pot += unconfirmed
+		gs.GameServerRedis.HSet(gs.ID, "pot", strconv.Itoa(pot))
+		gs.Pot = pot
+		gs.Mutex.Unlock()
+
 		c := NewClient(message, conn)
 		c.Status = "in game"
 		c.Player = &Player{}
@@ -161,11 +177,11 @@ func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
 }
 
 // TODO OOP?
-func validateToken(token string, gameserverid string, playerRedis *redis.Client) bool {
+func validateToken(token string,playerRedis *redis.Client) bool {
 	status, _ := playerRedis.HGet(token, "status").Result()
 	if status == "paid" {
+		// Should validate that they paid the correct amount for the game
 		playerRedis.HSet(token, "status", "in game")
-		playerRedis.HSet(token, "game", gameserverid)
 		return true
 	}
 	return false
@@ -230,13 +246,16 @@ func min(a, b int) int {
 func (gs *GameServer) ClientWon(client *Client) {
 	client.Status = "won"
 	gs.PlayerRedis.HSet(client.Token, "status", "won")
+	client.SendPot(gs)
 	client.SendStatus(gs)
 }
 
 func (gs *GameServer) ClientLost(client *Client) {
 	client.Status = "lost"
 	gs.PlayerRedis.HSet(client.Token, "status", "lost")
+	gs.Mutex.Lock()
 	gs.GameServerRedis.HSet(gs.ID, "players", len(gs.World.Players))
+	gs.Mutex.Unlock()
 }
 
 func (gs *GameServer) CalculateLeaderboard() {
