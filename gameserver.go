@@ -1,321 +1,120 @@
 package main
 
 import (
-	"fmt"
+	"github.com/gorilla/websocket"
+	"github.com/op/go-logging"
 	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
-	"sync"
-
-	"github.com/go-redis/redis"
-	"github.com/gonum/stat"
-	"github.com/gorilla/websocket"
-	"github.com/parth/go-gameloop"
 )
 
-type GameServer struct {
-	Users           map[*Client]*Player
-	Colors          map[*Snake]uint32
-	World           *Map
-	GameServerRedis *redis.Client
-	PlayerRedis     *redis.Client
-	ID              string
-	GL              *gameLoop.GameLoop
-	PlayerCount     int
-	Pot             int
-	SpectatorView   [][]uint32
-	Leaderboard     []LeaderboardMessage
-	Spectators      []*Client
-	Minimap         []MinimapMessage
-	LeaderboardSize int
-	Mutex *sync.Mutex
-}
-
-var gameserver *GameServer
-
 func main() {
-	gameServerRedis := connectToRedis("redis-gameservers:6379")
-	playerRedis := connectToRedis("redis-players:6379")
-	id := os.Getenv("GSPORT")
+	state := &State{}
 
-	gameServerRedis.HSet(id, "status", "idle")
+	state.SetupLogger()
+	state.SetupInitialConfig()
+	state.SetRandomSeed()
+	state.SetupMiscServerVariables()
+	state.BroadcastState()
+	state.SetSignupCount()
+	state.CreateMap()
+	state.SetupConnectionHandler()
+}
 
-	players := getPlayers(id, gameServerRedis)
-	pot := getPot(id, gameServerRedis)
-	mutex := &sync.Mutex{}
-	gameserver = &GameServer{
-		Users:           make(map[*Client]*Player),
-		Colors:          make(map[*Snake]uint32),
-		World:           NewMap(players, 20, 90),
-		GameServerRedis: gameServerRedis,
-		PlayerRedis:     playerRedis,
-		ID:              id,
-		PlayerCount:     players,
-		Pot:             pot,
-		Mutex: mutex,
+func (s *State) SetupLogger() {
+	s.Log = logging.MustGetLogger("Gameserver")
+
+	format := logging.MustStringFormatter(
+		`%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`,
+	)
+	backend := logging.NewLogBackend(os.Stdout, "", 0)
+	formatter := logging.NewBackendFormatter(backend, format)
+
+	logging.SetBackend(formatter)
+}
+
+func (s *State) SetupInitialConfig() {
+	s.InitialConfig = &Config{
+		ScalingFactor:   250,
+		FoodPerPlayer:   100,
+		SprintFactor:    2,
+		LeaderboardSize: 2,
+		FrameRate:       5,
+		DefaultZoom:     10,
 	}
+}
 
-	gameserver.World.GameServer = gameserver
+func (s *State) SetupMiscServerVariables() {
+	// Redis stuff
+	s.GameserverRedis = connectToRedis("127.0.0.1:6380", s.Log)
+	s.PlayerRedis = connectToRedis("127.0.0.1:6379", s.Log)
 
-	if gameserver.PlayerCount < 10 {
-		gameserver.LeaderboardSize = gameserver.PlayerCount
+	// Which port?
+	id, present := os.LookupEnv("GSPORT")
+	if present {
+		s.GameID = id
+		s.Log.Info("Intended Port: %v", s.GameID)
 	} else {
-		gameserver.LeaderboardSize = 10
+		s.GameID = "10000"
+		s.Log.Error("GameID not present, guessing: %v", s.GameID)
 	}
 
-	gameserver.SpectatorView = make([][]uint32, len(gameserver.World.Tiles))
+	// Alloc variables
+	s.Spectators = map[int]*Spectator{}
 
-	for i := range gameserver.World.Tiles {
-		gameserver.SpectatorView[i] = make([]uint32, len(gameserver.World.Tiles[i]))
-	}
-
-	gameserver.GL = gameLoop.New(5, gameserver.MapUpdater)
-
-	http.HandleFunc("/ws", wsHandler)
-	panic(http.ListenAndServe(":10000", nil))
+	// Initial Variable values
+	s.Running = false
 
 }
 
-func getPlayers(id string, gameServerRedis *redis.Client) int {
+func (s *State) BroadcastState() {
+	s.GameserverRedis.HSet(s.GameID, "status", "idle")
+	s.Log.Info("Broadcasted Idle")
+}
+
+func (s *State) SetRandomSeed() {
+	now := time.Now().UnixNano()
+	rand.Seed(now)
+	s.Log.Debug("Seed: %v", now)
+}
+
+func (s *State) SetSignupCount() {
 	for {
-		playerCountString, _ := gameServerRedis.HGet(id, "players").Result()
+		s.Log.Info("Checking for player count")
+		playerCountString, _ := s.GameserverRedis.HGet(s.GameID, "players").Result()
 		players, _ := strconv.Atoi(playerCountString)
 		if players == 0 {
+			s.Log.Debug("Player count unavailable, sleeping")
 			time.Sleep(1000 * time.Millisecond)
 		} else {
-			gameServerRedis.HSet(id, "status", "ready")
-			return players
+			s.GameserverRedis.HSet(s.GameID, "status", "ready")
+			s.SignupCount = players
+			s.Log.Info("Player Count: %v", players)
+			return
 		}
 	}
-
-	return 0
 }
 
-func getPot(id string, gameServerRedis *redis.Client) int {
-	potString, err := gameServerRedis.HGet(id, "pot").Result()
-	if err != nil {
-		return 0
-	}
-	pot, _ := strconv.Atoi(potString)
-	return pot
-}
-
-func connectToRedis(addr string) *redis.Client {
-	var client *redis.Client
-	for {
-		client = redis.NewClient(&redis.Options{
-			Addr:     addr,
-			Password: "",
-			DB:       0,
-		})
-		_, err := client.Ping().Result()
-		if err != nil {
-			fmt.Println("gameserver could not connect to redis")
-			fmt.Println(err)
-		} else {
-			break
-		}
-		time.Sleep(500 * time.Millisecond)
+func (s *State) SetupConnectionHandler() {
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
 	}
 
-	fmt.Println("connected to redis")
-
-	return client
-}
-
-func wsHandler(w http.ResponseWriter, r *http.Request) {
-	conn, err := websocket.Upgrade(w, r, w.Header(), 1024, 1024)
-	if err != nil {
-		http.Error(w, "Could not open websocket connection", http.StatusBadRequest)
-	}
-
-	gameserver.PlayerJoined(conn)
-}
-
-func (gs *GameServer) PlayerJoined(conn *websocket.Conn) {
-	fmt.Println("player joined")
-	message := &RegisterMessage{}
-
-	error := conn.ReadJSON(message)
-
-	if error == nil && message.Token != "spectating" && validateToken(message.Token, gs.PlayerRedis) {
-		gs.PlayerRedis.HSet(message.Token, "game", gs.ID)
-
-		gs.Mutex.Lock()
-		gs.GameServerRedis.SAdd(gs.ID+"-players", message.Token)
-		potString, _ := gs.GameServerRedis.HGet(gs.ID, "pot").Result()
-		unconfirmedString, _ := gs.PlayerRedis.HGet(message.Token, "unconfirmed").Result()
-		pot, _ := strconv.Atoi(potString)
-		unconfirmed, _ := strconv.Atoi(unconfirmedString)
-		pot += unconfirmed
-		gs.GameServerRedis.HSet(gs.ID, "pot", strconv.Itoa(pot))
-		gs.Pot = pot
-		gs.Mutex.Unlock()
-
-		c := NewClient(message, conn)
-		c.Status = "in game"
-		c.Player = &Player{}
-		gs.World.SpawnNewPlayer(c.Player)
-		c.Player.Client = c
-		c.SendPot(gs)
-
-		gs.Users[c] = c.Player
-		go c.CollectInput(conn)
-
-		fmt.Println(len(gs.Users), gs.PlayerCount)
-		if len(gs.Users) >= gs.PlayerCount && gs.GL.Running == false {
-			gs.GL.Start()
-			fmt.Println("started")
-		}
-	}
-
-	if message.Token == "spectating" {
-		gs.Spectators = append(gs.Spectators, NewClient(nil, conn))
-	}
-}
-
-// TODO OOP?
-func validateToken(token string,playerRedis *redis.Client) bool {
-	status, _ := playerRedis.HGet(token, "status").Result()
-	if status == "paid" {
-		// Should validate that they paid the correct amount for the game
-		playerRedis.HSet(token, "status", "in game")
+	upgrader.CheckOrigin = func(r *http.Request) bool {
 		return true
 	}
-	return false
-}
 
-func (gs *GameServer) PublishState(msg string) {
-	gs.GameServerRedis.HSet(gs.ID, "status", msg)
-}
-
-var currentTime = time.Now()
-var frameTime = time.Since(currentTime) / time.Millisecond
-var times = []float64{}
-
-func (gs *GameServer) MapUpdater(delta float64) {
-	frameTime = time.Since(currentTime) / time.Millisecond
-	times = append(times, float64(frameTime))
-	fmt.Println(stat.MeanStdDev(times, nil))
-	currentTime = time.Now()
-
-	gs.PublishState("game started")
-	gs.World.Update()
-	gs.CalculateLeaderboard()
-	gs.CalculateSpectatorView()
-	gs.CalculateMinimap()
-
-	for player := range gs.World.Players {
-		player.Client.SendPerspective(gs)
-		player.Client.SendCustomLeaderboard(gs)
-		player.Client.SendCustomMinimap(gs)
-	}
-
-	for loser := range gs.World.Losers {
-		loser.Client.SendSpectatorView(gs)
-		loser.Client.SendLeaderboard(gs)
-		loser.Client.SendMinimap(gs)
-	}
-
-	for _, spectator := range gs.Spectators {
-		spectator.SendSpectatorView(gs)
-		spectator.SendLeaderboard(gs)
-		spectator.SendMinimap(gs)
-	}
-
-	if len(gs.World.Players) == 1 {
-		gs.PostGame()
-		gs.PublishState("game finished")
-		for player, _ := range gs.World.Players {
-			gs.ClientWon(player.Client)
+	http.HandleFunc("/ws", func(writer http.ResponseWriter, request *http.Request) {
+		conn, err := upgrader.Upgrade(writer, request, nil)
+		if err != nil {
+			http.Error(writer, "Could not create connection, please retry", http.StatusBadGateway)
+			s.Log.Error("Could not create websocket")
+			return
 		}
-		os.Exit(0)
-	}
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-
-	return b
-}
-
-func (gs *GameServer) ClientWon(client *Client) {
-	client.Status = "won"
-	gs.PlayerRedis.HSet(client.Token, "status", "won")
-	client.SendPot(gs)
-	client.SendStatus(gs)
-}
-
-func (gs *GameServer) ClientLost(client *Client) {
-	client.Status = "lost"
-	gs.PlayerRedis.HSet(client.Token, "status", "lost")
-	gs.Mutex.Lock()
-	gs.GameServerRedis.HSet(gs.ID, "players", len(gs.World.Players))
-	gs.Mutex.Unlock()
-}
-
-func (gs *GameServer) CalculateLeaderboard() {
-	gs.LeaderboardSize = min(min(gs.PlayerCount, len(gs.World.Players)), 10)
-	leaderboard := make([]LeaderboardMessage, len(gs.World.Players))
-	snakes := gs.World.SortSnakes()
-	for i, snake := range snakes {
-		leaderboard[i] = NewLeaderboardMessage(i, gs, snake)
-	}
-
-	gs.Leaderboard = leaderboard
-}
-
-// What does using a tile as a fundemental game object look like.
-// Maybe something like a Snakenode and a Food *are* tiles. And they
-// Dictate what they look like.
-func (gs *GameServer) GetColor(tile *Tile) uint32 {
-	if tile.Food != nil {
-		return 0x00FF00
-	}
-
-	if tile.Snake == nil {
-		return 0xF0F0F0
-	}
-
-	if val, ok := gs.Colors[tile.Snake]; ok {
-		return val
-	}
-
-	gs.Colors[tile.Snake] = rand.Uint32()
-	return gs.Colors[tile.Snake]
-}
-
-func (gs *GameServer) CalculateSpectatorView() {
-	for r := range gs.World.Tiles {
-		for c := range gs.World.Tiles[r] {
-			gs.SpectatorView[r][c] = gs.GetColor(&gs.World.Tiles[r][c])
-		}
-	}
-}
-
-func (gs *GameServer) CalculateMinimap() {
-	topSnakes := gs.World.SortSnakes()[:gs.LeaderboardSize]
-	var minimap []MinimapMessage // TODO Convert to minimapmessage
-
-	for _, snake := range topSnakes {
-		current := snake.Head
-		for i := 0; i < snake.Length; i++ {
-			minimap = append(minimap, MinimapMessage{
-				Row:   current.Row,
-				Col:   current.Col,
-				Color: gs.GetColor(&gs.World.Tiles[current.Row][current.Col]),
-			})
-			current = current.Next
-		}
-	}
-	gs.Minimap = minimap
-}
-
-func (gs *GameServer) PostGame() {
-	// TODO token consumed
-	// TODO Money awarded
+		s.NewConnectionHandler(conn)
+	})
+	panic(http.ListenAndServe(":10000", nil))
 }
