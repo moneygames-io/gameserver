@@ -1,4 +1,4 @@
-FROM golang:1.8
+FROM golang:1.10
 
 WORKDIR /go/src/app
 RUN curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
