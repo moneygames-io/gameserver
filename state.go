@@ -103,4 +103,4 @@ func (m *Map) Get(c *Coordinate) MapObject {
 
 const FrameMessage = 1
 const WonMessage = 2
-const LostMessage = 2
+const LostMessage = 3
