@@ -15,6 +15,7 @@ func (s *State) ValidateToken(token string) bool {
 
 func (s *State) TokenConsumed(token string) {
 	s.PlayerRedis.HSet(token, "status", "in game")
+	s.PlayerRedis.HSet(token, "game", s.GameID)
 }
 
 func (s *State) NewConnectionHandler(conn *websocket.Conn) {
