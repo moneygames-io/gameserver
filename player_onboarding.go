@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/gorilla/websocket"
 	"strings"
+	"strconv"
 )
 
 func (s *State) ValidateToken(token string) bool {
@@ -14,8 +15,12 @@ func (s *State) ValidateToken(token string) bool {
 }
 
 func (s *State) TokenConsumed(token string) {
+	unconfirmed, _ := s.PlayerRedis.HGet(token, "unconfirmed").Result()
+	incr, _ := strconv.ParseInt(unconfirmed, 10, 64) // incr must be base 10 int64
+	s.GameserverRedis.HIncrBy(s.GameID, "unconfirmed", incr)
 	s.PlayerRedis.HSet(token, "status", "in game")
 	s.PlayerRedis.HSet(token, "game", s.GameID)
+	s.PlayerRedis.SAdd(s.GameID, token)
 }
 
 func (s *State) NewConnectionHandler(conn *websocket.Conn) {
