@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/gorilla/websocket"
 	"github.com/op/go-logging"
+	"github.com/pions/webrtc"
 	"math/rand"
 	"net/http"
 	"os"
@@ -20,6 +20,7 @@ func main() {
 	state.BroadcastState()
 	state.SetSignupCount()
 	state.CreateMap()
+
 	state.SetupConnectionHandler()
 }
 
@@ -43,15 +44,22 @@ func (s *State) SetupInitialConfig() {
 		LeaderboardSize: 2,
 		FrameRate:       5,
 		DefaultZoom:     10,
+		RTCSettings: webrtc.RTCConfiguration{
+			IceServers: []webrtc.RTCIceServer{
+				{
+					URLs: []string{"stun:stun.l.google.com:19302"},
+				},
+			},
+		},
 	}
 }
 
 func (s *State) SetupMiscServerVariables() {
 	// Redis stuff
-	s.GameserverRedis = connectToRedis("redis-gameservers:6379", s.Log)
-	s.PlayerRedis = connectToRedis("redis-players:6379", s.Log)
+	s.GameserverRedis = connectToRedis("127.0.0.1:6379", s.Log)
+	s.PlayerRedis = connectToRedis("127.0.0.1:6380", s.Log)
 
-	// Which port?
+	// Which port am I bound too from docker swarm's perspective
 	id, present := os.LookupEnv("GSPORT")
 	if present {
 		s.GameID = id
@@ -70,8 +78,8 @@ func (s *State) SetupMiscServerVariables() {
 }
 
 func (s *State) BroadcastState() {
+	s.Log.Info("Broadcasting Idle")
 	s.GameserverRedis.HSet(s.GameID, "status", "idle")
-	s.Log.Info("Broadcasted Idle")
 }
 
 func (s *State) SetRandomSeed() {
@@ -92,29 +100,26 @@ func (s *State) SetSignupCount() {
 			s.GameserverRedis.HSet(s.GameID, "status", "ready")
 			s.SignupCount = players
 			s.Log.Info("Player Count: %v", players)
+			s.GameserverRedis.HSet(s.GameID, "players", 0)
 			return
 		}
 	}
 }
 
-func (s *State) SetupConnectionHandler() {
-	upgrader := websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-	}
-
-	upgrader.CheckOrigin = func(r *http.Request) bool {
-		return true
-	}
-
-	http.HandleFunc("/ws", func(writer http.ResponseWriter, request *http.Request) {
-		conn, err := upgrader.Upgrade(writer, request, nil)
-		if err != nil {
-			http.Error(writer, "Could not create connection, please retry", http.StatusBadGateway)
-			s.Log.Error("Could not create websocket")
-			return
+func corsHandler(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "OPTIONS" {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		} else {
+			h(w, r)
 		}
-		s.NewConnectionHandler(conn)
-	})
-	panic(http.ListenAndServe(":10000", nil))
+	}
+}
+
+// Sets up connection handler that dispatches a goroutine for every request
+func (s *State) SetupConnectionHandler() {
+
+	http.Handle("/player", corsHandler(s.NewPlayer))
+	s.Log.Fatal(http.ListenAndServe(":10000", nil))
 }

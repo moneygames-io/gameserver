@@ -27,12 +27,28 @@
   version = "v6.14.1"
 
 [[projects]]
-  digest = "1:7b5c6e2eeaa9ae5907c391a91c132abfd5c9e8a784a341b5625e750c67e6825d"
-  name = "github.com/gorilla/websocket"
+  digest = "1:c79fb010be38a59d657c48c6ba1d003a8aa651fa56b579d959d74573b7dff8e1"
+  name = "github.com/gorilla/context"
   packages = ["."]
   pruneopts = "UT"
-  revision = "66b9c49e59c6c48f0ffce28c2d8b8a5678502c6d"
+  revision = "08b5f424b9271eedf6f9f0ce86cb9396ed337a42"
+  version = "v1.1.1"
+
+[[projects]]
+  digest = "1:664d37ea261f0fc73dd17f4a1f5f46d01fbb0b0d75f6375af064824424109b7d"
+  name = "github.com/gorilla/handlers"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "7e0847f9db758cdebd26c149d0ae9d5d0b9c98ce"
   version = "v1.4.0"
+
+[[projects]]
+  digest = "1:e73f5b0152105f18bc131fba127d9949305c8693f8a762588a82a48f61756f5f"
+  name = "github.com/gorilla/mux"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "e3702bed27f0d39777b0b37b664b6280e8ef8fbf"
+  version = "v1.6.2"
 
 [[projects]]
   digest = "1:5b3b29ce0e569f62935d9541dff2e16cc09df981ebde48e82259076a73a3d0c7"
@@ -41,6 +57,57 @@
   pruneopts = "UT"
   revision = "b2cb9fa56473e98db8caba80237377e83fe44db5"
   version = "v1"
+
+[[projects]]
+  digest = "1:4e39fc989983561696593007bf93783328db5b97334e2347474bebcaee1d0fc2"
+  name = "github.com/pions/dtls"
+  packages = [
+    "pkg/dtls",
+    "pkg/dtls/internal/udp",
+  ]
+  pruneopts = "UT"
+  revision = "26f587e06ed18c66b388cf537b80f6f8e3c4365f"
+  version = "v1.0.2"
+
+[[projects]]
+  branch = "master"
+  digest = "1:940b5484cd8b148a6e228e4334bf2f34d85d4659c2b61a2c26361aa6021a5a25"
+  name = "github.com/pions/pkg"
+  packages = ["stun"]
+  pruneopts = "UT"
+  revision = "b60cd756f712a4e3770fdb3ddba6244914a6a01e"
+
+[[projects]]
+  digest = "1:6ca3c55932b9f902b43751963c955401ceeb2d8653858e4a38776ae835c9c499"
+  name = "github.com/pions/webrtc"
+  packages = [
+    ".",
+    "internal/datachannel",
+    "internal/mux",
+    "internal/network",
+    "internal/sctp",
+    "internal/sdp",
+    "internal/srtp",
+    "internal/util",
+    "pkg/datachannel",
+    "pkg/ice",
+    "pkg/media",
+    "pkg/rtcerr",
+    "pkg/rtcp",
+    "pkg/rtp",
+    "pkg/rtp/codecs",
+  ]
+  pruneopts = "UT"
+  revision = "7d19be0bca79fa3660a90a846f9d5ec3a53e12b7"
+  version = "v1.2.0"
+
+[[projects]]
+  digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
 
 [[projects]]
   digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
@@ -58,13 +125,38 @@
   revision = "f35b8ab0b5a2cef36673838d662e249dd9c94686"
   version = "v1.2.2"
 
+[[projects]]
+  branch = "master"
+  digest = "1:6829afd260785f0d9cd665fc87e15f70b72648d68cab0b5bdd7711a054ba2c0e"
+  name = "golang.org/x/crypto"
+  packages = ["curve25519"]
+  pruneopts = "UT"
+  revision = "505ab145d0a99da450461ae2c1a9f6cd10d1f447"
+
+[[projects]]
+  branch = "master"
+  digest = "1:1cea5c02079247fde34247c1a1b97ff8e450d0869bb712414a90703eb31fb354"
+  name = "golang.org/x/net"
+  packages = [
+    "bpf",
+    "internal/iana",
+    "internal/socket",
+    "ipv4",
+  ]
+  pruneopts = "UT"
+  revision = "927f97764cc334a6575f4b7a1584a147864d5723"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
     "github.com/go-redis/redis",
-    "github.com/gorilla/websocket",
+    "github.com/gorilla/handlers",
+    "github.com/gorilla/mux",
     "github.com/op/go-logging",
+    "github.com/pions/webrtc",
+    "github.com/pions/webrtc/pkg/datachannel",
+    "github.com/pions/webrtc/pkg/ice",
     "github.com/stretchr/testify/assert",
   ]
   solver-name = "gps-cdcl"

@@ -2,26 +2,61 @@ package main
 
 import (
 	"github.com/go-redis/redis"
-	"github.com/gorilla/websocket"
 	"github.com/op/go-logging"
+	"github.com/pions/webrtc"
+	"sync"
 )
 
+// Represents the state of the current game, root node of the object graph
+// TODO move things that are not threadsafe to their own type?
+// It's kinda strange that for some funcs we lock and for some we don't
+// Could lock for everything for uniformity, but that feels strange as some functions only interact with logger/redis
+// TokenConsumed highlights that a bunch of these aren't actually part of this program's state
 type State struct {
-	GameID          string
+	sync.Mutex
+
+	// Used to identify "this" game in GameserverRedis
+	GameID string
+
+	// Used to provide status updates about "this" game's state
 	GameserverRedis *redis.Client
-	PlayerRedis     *redis.Client
-	Log             *logging.Logger
-	InitialConfig   *Config
-	SignupCount     int
-	PlayerCount     int
-	SpectatorCount  int
-	FrameRate       int
-	Running         bool
-	World           *Map
-	Spectators      map[int]*Spectator // Don't make this a map
-	Rankings        []*Player
+
+	// Used to provide information related to players
+	PlayerRedis *redis.Client
+
+	// Logging
+	Log *logging.Logger
+
+	// Used to read configuration settings across the app
+	InitialConfig *Config
+
+	// How many players we're expecting
+	SignupCount int
+
+	// How many players have been spawned
+	PlayerCount int
+
+	// How many spectators are watching this game
+	SpectatorCount int
+
+	// The current frame rate of the game
+	FrameRate int
+
+	// Whether the game has started or not
+	Running bool
+
+	// 2D world which all the game logic operates on
+	World *Map
+
+	// Collection of spectators
+	// TODO: Don't make this a map
+	Spectators map[int]*Spectator
+
+	// After a game loop has executed, these are the current rankings of the players
+	Rankings []*Player
 }
 
+// Used to store all the information regarding a player
 type Player struct {
 	Name           string
 	Token          string
@@ -29,7 +64,7 @@ type Player struct {
 	SpectatorCount int
 	Input          *Input
 	Message        *Message
-	Connection     *websocket.Conn
+	Connection     *webrtc.RTCDataChannel
 }
 
 type Input struct {
@@ -40,7 +75,7 @@ type Input struct {
 
 type Spectator struct {
 	Name        string
-	Connection  *websocket.Conn
+	Connection  *webrtc.RTCDataChannel
 	CurrentView *Player
 }
 
@@ -74,6 +109,7 @@ type Config struct {
 	LeaderboardSize int
 	FrameRate       int
 	DefaultZoom     int
+	RTCSettings     webrtc.RTCConfiguration
 }
 
 type Message struct {
@@ -101,6 +137,7 @@ func (m *Map) Get(c *Coordinate) MapObject {
 	}
 }
 
+// Program-wide constants
 const FrameMessage = 1
 const WonMessage = 2
 const LostMessage = 3
