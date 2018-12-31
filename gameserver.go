@@ -42,7 +42,7 @@ func (s *State) SetupInitialConfig() {
 		FoodPerPlayer:   100,
 		SprintFactor:    2,
 		LeaderboardSize: 2,
-		FrameRate:       10,
+		FrameRate:       7,
 		DefaultZoom:     10,
 		RTCSettings: webrtc.RTCConfiguration{
 			IceServers: []webrtc.RTCIceServer{
