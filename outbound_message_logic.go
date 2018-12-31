@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/gorilla/websocket"
+	"github.com/pions/webrtc/pkg/datachannel"
 	"hash/fnv"
 	"math"
 	"reflect"
@@ -104,19 +104,23 @@ func (s *State) SendMessagesToPlayers() {
 		header.Len *= 4
 		header.Cap *= 4
 		data := *(*[]byte)(unsafe.Pointer(&header))
-		player.Connection.WriteMessage(websocket.BinaryMessage, data) // TODO catch panic and recover
+		_ = player.Connection.Send(datachannel.PayloadBinary{Data: data})
 	}
 }
 
 func (s *State) SendMessagesToSpectators() {
 	for _, spectator := range s.Spectators {
-		spectator.Connection.WriteJSON(spectator.CurrentView.Message.Serialized) // TODO catch panic and recover
+		header := *(*reflect.SliceHeader)(unsafe.Pointer(&spectator.CurrentView.Message.Serialized))
+		header.Len *= 4
+		header.Cap *= 4
+		data := *(*[]byte)(unsafe.Pointer(&header))
+		_ = spectator.Connection.Send(datachannel.PayloadBinary{Data: data})
 	}
 }
 
-func (s *State) SendWin(p *Player) {
+func (s *State) SendWin(player *Player) {
 	pot, _ := s.GameserverRedis.HGet(s.GameID, "pot").Result()
-	s.PlayerRedis.HSet(p.Token, "status", "won")
+	s.PlayerRedis.HSet(player.Token, "status", "won")
 
 	message := []rune{WonMessage}
 	message = append(message, []rune(pot)...)
@@ -126,11 +130,11 @@ func (s *State) SendWin(p *Player) {
 	header.Len *= 4
 	header.Cap *= 4
 	data := *(*[]byte)(unsafe.Pointer(&header))
-	p.Connection.WriteMessage(websocket.BinaryMessage, data) // TODO catch panic and recover
+	_ = player.Connection.Send(datachannel.PayloadBinary{Data: data})
 }
 
-func (s *State) SendLoss(p *Player) {
-	s.PlayerRedis.HSet(p.Token, "status", "won")
+func (s *State) SendLoss(player *Player) {
+	s.PlayerRedis.HSet(player.Token, "status", "won")
 
 	message := []rune{LostMessage}
 
@@ -138,12 +142,12 @@ func (s *State) SendLoss(p *Player) {
 	header.Len *= 4
 	header.Cap *= 4
 	data := *(*[]byte)(unsafe.Pointer(&header))
-	p.Connection.WriteMessage(websocket.BinaryMessage, data) // TODO catch panic and recover
+	_ = player.Connection.Send(datachannel.PayloadBinary{Data: data})
 }
 
 func hash(s string) int32 { // TODO PRE-PRODUCTION Is this secure enough to use for the token?
 	h := fnv.New32a()
-	h.Write([]byte(s))
+	_, _ = h.Write([]byte(s))
 	hash := h.Sum32()
 	i32 := int32(hash)
 	if i32 < 0 {

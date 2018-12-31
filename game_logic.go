@@ -28,9 +28,13 @@ func (s *State) CreateMap() {
 }
 
 func (s *State) StartGame() {
+
+	s.Lock()
 	s.Log.Info("Game started")
 	s.Running = true
 	s.FrameRate = s.InitialConfig.FrameRate
+	s.Unlock()
+
 	s.FrameUpdater()
 }
 
@@ -55,13 +59,14 @@ func (s *State) FrameUpdater() {
 
 		startTime := time.Now()
 
+		s.Lock()
 		s.MoveSnakesForward()
 		s.CalculateRankings()
 		s.GenerateMessageModels()
 		s.SerializeMessages()
 		s.SendMessagesToPlayers()
 		s.SendMessagesToSpectators()
-
+		s.Unlock()
 		rate := time.Second / time.Duration(s.FrameRate)
 		delta := time.Since(startTime)
 
