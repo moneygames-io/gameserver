@@ -56,8 +56,8 @@ func (s *State) SetupInitialConfig() {
 
 func (s *State) SetupMiscServerVariables() {
 	// Redis stuff
-	s.GameserverRedis = connectToRedis("127.0.0.1:6379", s.Log)
-	s.PlayerRedis = connectToRedis("127.0.0.1:6380", s.Log)
+	s.GameserverRedis = connectToRedis("redis-gameservers:6379", s.Log)
+	s.PlayerRedis = connectToRedis("redis-players:6379", s.Log)
 
 	// Which port am I bound too from docker swarm's perspective
 	id, present := os.LookupEnv("GSPORT")
